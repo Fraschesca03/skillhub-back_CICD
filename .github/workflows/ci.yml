@@ -29,38 +29,37 @@ jobs:
         options: --health-cmd="mongosh --eval 'db.adminCommand(\"ping\")'" --health-interval=10s --health-timeout=5s --health-retries=5
 
     steps:
-      # 1 - Checkout
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2 - Setup PHP
-      - name: Setup PHP
+      # Installation PHP avec mongodb 2.2 via pecl
+      - name: Setup PHP with mongodb 2.2
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
-          extensions: pdo, pdo_mysql, mbstring, exif, bcmath, gd, mongodb
+          extensions: pdo, pdo_mysql, mbstring, exif, bcmath, gd, mongodb-2.2.1
           coverage: xdebug
 
-      # 3 - Install dependencies (pas de sous-dossier, code a la racine)
+      # Verification de la version mongodb installee
+      - name: Check mongodb extension version
+        run: php -r "echo phpversion('mongodb');"
+
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      # 4 - Prepare Laravel
       - name: Prepare environment
         run: |
           cp .env.example .env
           php artisan key:generate
           php artisan jwt:secret
 
-      # 5 - Lint
       - name: Lint
         run: |
           composer require --dev squizlabs/php_codesniffer --no-interaction -q
           vendor/bin/phpcs --standard=PSR12 app/ --ignore=app/Http/Middleware,app/Providers || true
 
-      # 6 - Tests avec couverture
       - name: Run tests
         env:
           APP_ENV: testing
@@ -77,19 +76,15 @@ jobs:
           mkdir -p build/logs
           php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
 
-      # 7 - Build image Docker taguee avec git SHA
       - name: Build Docker image
-        run: |
-          docker build -t skillhub-api:${{ github.sha }} .
+        run: docker build -t skillhub-api:${{ github.sha }} .
 
-      # 8 - SonarCloud Scan
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # Job CD - push image apres merge sur main
   push-image:
     runs-on: ubuntu-latest
     needs: test-and-analyze
