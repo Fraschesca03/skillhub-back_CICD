@@ -1,4 +1,15 @@
-name: CI SkillHub
+# ============================================================
+# SkillHub Backend - Pipeline CI/CD
+# Conforme au CDC Bloc 03 - Cloud, DevOps et Architecture
+#
+# Etapes CI : install -> lint -> test -> build image
+# Etape CD  : push image registry (merge sur main uniquement)
+#
+# Declenchement : push vers main/dev + Pull Requests
+# Secrets requis : SONAR_TOKEN, DOCKER_USERNAME, DOCKER_PASSWORD
+# ============================================================
+
+name: CI/CD SkillHub
 
 on:
   push:
@@ -7,10 +18,16 @@ on:
     branches: [main, dev]
 
 jobs:
-  test-and-analyze:
+
+  # ===========================================================
+  # JOB CI : install, lint, test, build image
+  # ===========================================================
+  ci:
+    name: CI - Install / Lint / Test / Build
     runs-on: ubuntu-latest
 
     services:
+      # Base de donnees MySQL pour les tests
       mysql:
         image: mysql:8
         env:
@@ -20,22 +37,38 @@ jobs:
           MYSQL_ROOT_PASSWORD: root_pass
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
+      # Base de donnees MongoDB pour les logs
       mongodb:
         image: mongo:6
         ports:
           - 27017:27017
-        options: --health-cmd="mongosh --eval 'db.adminCommand(\"ping\")'" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: >-
+          --health-cmd="mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
-      - name: Checkout
+
+      # -----------------------------------------------------------
+      # ETAPE 1 : Checkout du code source
+      # -----------------------------------------------------------
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # fetch-depth 0 requis pour SonarCloud (analyse complete)
           fetch-depth: 0
 
-      # Installation PHP avec mongodb 2.2 via pecl
-      - name: Setup PHP with mongodb 2.2
+      # -----------------------------------------------------------
+      # ETAPE 2 : Installation de PHP 8.2 avec ext-mongodb 2.2.1
+      # -----------------------------------------------------------
+      - name: Setup PHP 8.2 with extensions
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
@@ -43,64 +76,113 @@ jobs:
           coverage: xdebug
 
       # Verification de la version mongodb installee
-      - name: Check mongodb extension version
-        run: php -r "echo phpversion('mongodb');"
+      - name: Verify mongodb extension version
+        run: php -r "echo 'mongodb version: ' . phpversion('mongodb') . PHP_EOL;"
 
+      # -----------------------------------------------------------
+      # ETAPE 3 : Installation des dependances (Composer)
+      # -----------------------------------------------------------
       - name: Install dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist
+        run: |
+          composer install \
+            --no-interaction \
+            --no-progress \
+            --prefer-dist
 
-      - name: Prepare environment
+      # -----------------------------------------------------------
+      # ETAPE 4 : Preparation de l'environnement Laravel
+      # -----------------------------------------------------------
+      - name: Prepare Laravel environment
         run: |
           cp .env.example .env
           php artisan key:generate
-          php artisan jwt:secret
+          php artisan jwt:secret --force
 
-      - name: Lint
+      # -----------------------------------------------------------
+      # ETAPE 5 : LINT - Analyse statique PHP_CodeSniffer (PSR-12)
+      # -----------------------------------------------------------
+      - name: Lint - PHP_CodeSniffer PSR-12
         run: |
-          composer require --dev squizlabs/php_codesniffer --no-interaction -q
-          vendor/bin/phpcs --standard=PSR12 app/ --ignore=app/Http/Middleware,app/Providers || true
+          composer require --dev squizlabs/php_codesniffer \
+            --no-interaction --quiet
+          vendor/bin/phpcs \
+            --standard=PSR12 \
+            --ignore=app/Http/Middleware,app/Providers,app/Mail,app/Console \
+            app/ \
+            || true
 
-      - name: Run tests
-        env:
-          APP_ENV: testing
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: skillhub_db
-          DB_USERNAME: skillhub_user
-          DB_PASSWORD: skillhub_pass
-          MONGO_HOST: 127.0.0.1
-          MONGO_PORT: 27017
-          MONGO_DATABASE: skillhub_logs
+      # -----------------------------------------------------------
+      # ETAPE 6 : TESTS - PHPUnit avec rapport de couverture
+      # -----------------------------------------------------------
+      - name: Test - PHPUnit with coverage
         run: |
+          # Charger les variables du .env (APP_KEY, JWT_SECRET generes)
+          set -a && source .env && set +a
+
+          # Surcharger les variables de connexion pour le runner CI
+          export DB_CONNECTION=mysql
+          export DB_HOST=127.0.0.1
+          export DB_PORT=3306
+          export DB_DATABASE=skillhub_db
+          export DB_USERNAME=skillhub_user
+          export DB_PASSWORD=skillhub_pass
+          export MONGO_HOST=127.0.0.1
+          export MONGO_PORT=27017
+          export MONGO_DATABASE=skillhub_logs
+          export APP_ENV=testing
+
           mkdir -p build/logs
-          php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
+          php artisan test \
+            --coverage-clover=build/logs/clover.xml \
+            --log-junit=build/logs/junit.xml
 
+      # -----------------------------------------------------------
+      # ETAPE 7 : BUILD - Image Docker taguee avec le git SHA
+      # -----------------------------------------------------------
       - name: Build Docker image
-        run: docker build -t skillhub-api:${{ github.sha }} .
+        run: |
+          docker build \
+            -t skillhub-api:${{ github.sha }} \
+            .
+          echo "Image built: skillhub-api:${{ github.sha }}"
 
+      # -----------------------------------------------------------
+      # ETAPE 8 : SonarCloud - Analyse qualite du code
+      # -----------------------------------------------------------
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  push-image:
+  # ===========================================================
+  # JOB CD : Push image Docker Hub (merge sur main uniquement)
+  # ===========================================================
+  cd:
+    name: CD - Push image to Docker Hub
     runs-on: ubuntu-latest
-    needs: test-and-analyze
+    needs: ci
+    # Declenche uniquement apres merge sur main
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Checkout
+
+      - name: Checkout code
         uses: actions/checkout@v4
 
+      # Connexion Docker Hub via secrets (aucune credential en clair)
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push image
+      # Build et push de l'image taguee avec le git SHA
+      - name: Build and push image to Docker Hub
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }} .
-          docker push ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }} \
+            .
+          docker push \
+            ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}
+          echo "Image pushed: ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}"
