@@ -9,6 +9,14 @@ jobs:
     name: Lint, Tests et Couverture
     runs-on: ubuntu-latest
     services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: skillhub_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
       mongodb:
         image: mongo:6
         ports:
@@ -27,7 +35,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, xml, pdo_sqlite, mongodb-2.2.0, pcov, gd
+          extensions: mbstring, xml, pdo_mysql, pdo_sqlite, mongodb-2.2.0, pcov, gd
           coverage: pcov
       - name: Cache Composer
         uses: actions/cache@v4
@@ -46,8 +54,12 @@ jobs:
           printf 'APP_KEY=\n' >> .env
           printf 'APP_DEBUG=true\n' >> .env
           printf 'APP_URL=http://localhost\n' >> .env
-          printf 'DB_CONNECTION=sqlite\n' >> .env
-          printf 'DB_DATABASE=:memory:\n' >> .env
+          printf 'DB_CONNECTION=mysql\n' >> .env
+          printf 'DB_HOST=127.0.0.1\n' >> .env
+          printf 'DB_PORT=3306\n' >> .env
+          printf 'DB_DATABASE=skillhub_test\n' >> .env
+          printf 'DB_USERNAME=root\n' >> .env
+          printf 'DB_PASSWORD=root\n' >> .env
           printf 'MONGO_HOST=127.0.0.1\n' >> .env
           printf 'MONGO_PORT=27017\n' >> .env
           printf 'MONGO_DATABASE=skillhub_test\n' >> .env
@@ -73,9 +85,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          args: >
-            -Dsonar.php.coverage.reportPaths=build/logs/clover.xml
-            -Dsonar.php.tests.reportPath=build/logs/junit.xml
+          args: "-Dsonar.php.coverage.reportPaths=build/logs/clover.xml -Dsonar.php.tests.reportPath=build/logs/junit.xml"
   build:
     name: Build Image Docker
     runs-on: ubuntu-latest
