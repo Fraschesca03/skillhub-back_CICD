@@ -9,7 +9,6 @@ use App\Models\Module;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -190,20 +189,41 @@ class CoverageTest extends TestCase
     // Necessite la route POST /api/profil/photo dans api.php
     // =========================================================================
 
+    /**
+     * Cree un vrai fichier JPEG minimal (1x1 pixel) sans avoir besoin de l extension GD.
+     * Compatible avec la validation Laravel `image` qui appelle getimagesize().
+     */
+    private function creerJpegSansGd(string $nom = 'photo.jpg'): UploadedFile
+    {
+        // JPEG 1x1 pixel blanc encode en base64 — valide pour getimagesize()
+        $contenu = base64_decode(
+            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQE' .
+            'BQoHBwYIDAoMCwsKCwsNCxAQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRQB' .
+            '2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU' .
+            'FBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/' .
+            'EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAA' .
+            'AAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ACWQAB//2Q=='
+        );
+
+        $chemin = sys_get_temp_dir() . '/test_' . uniqid() . '.jpg';
+        file_put_contents($chemin, $contenu);
+
+        return new UploadedFile($chemin, $nom, 'image/jpeg', null, true);
+    }
+
     /** @test */
     public function upload_photo_profil_fonctionne(): void
     {
-        Storage::fake('public');
         ['user' => $user, 'token' => $token] = $this->creerUtilisateur('apprenant');
 
-        // Creation d un faux fichier image pour le test
-        $fichier = UploadedFile::fake()->image('photo.jpg', 200, 200);
+        // JPEG minimal valide sans GD
+        $fichier = $this->creerJpegSansGd('photo.jpg');
 
         $response = $this->postJson('/api/profil/photo', [
             'photo' => $fichier,
         ], $this->headers($token));
 
-        // Si la route est absente, le test attend 404 et skip
+        // Si la route est absente de api.php, on skip proprement
         if ($response->status() === 404) {
             $this->markTestSkipped('Route POST /api/profil/photo absente de api.php');
         }
@@ -217,6 +237,7 @@ class CoverageTest extends TestCase
     {
         ['token' => $token] = $this->creerUtilisateur('apprenant');
 
+        // Fichier PDF : doit echouer la validation image
         $fichier = UploadedFile::fake()->create('document.pdf', 100, 'application/pdf');
 
         $response = $this->postJson('/api/profil/photo', [
@@ -233,13 +254,14 @@ class CoverageTest extends TestCase
     /** @test */
     public function upload_photo_profil_retourne_401_sans_token(): void
     {
-        $fichier = UploadedFile::fake()->image('photo.jpg');
+        // Pas besoin d un vrai fichier : l auth echoue avant la validation
+        $fichier = UploadedFile::fake()->create('photo.jpg', 10, 'image/jpeg');
 
         $response = $this->postJson('/api/profil/photo', [
             'photo' => $fichier,
         ]);
 
-        // 401 ou 404 selon que la route existe ou non
+        // 401 si la route existe, 404 si elle est absente
         $this->assertContains($response->status(), [401, 404]);
     }
 
