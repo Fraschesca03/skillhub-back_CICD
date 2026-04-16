@@ -8,9 +8,9 @@ Guide de contribution pour le projet SkillHub (Bloc 03 — Cloud, DevOps et Arch
 
 | Membre | Rôle | Responsabilités principales |
 |--------|------|-----------------------------|
-| Theo   | Tech Lead | Versionning Git, README, CONTRIBUTING, coordination, SonarCloud |
-| Fitia  | Cloud Architect | Rapport d'audit, schéma C4, plan budgétaire, comparaison cloud |
-| Nirina | DevOps Engineer | Dockerfile, docker-compose.yml, pipeline CI/CD, orchestration |
+| Nirina | Tech Lead | Versionning Git, README, CONTRIBUTING, coordination, SonarCloud |
+| Membre 2 | Cloud Architect | Rapport d'audit, schéma C4, plan budgétaire, comparaison cloud |
+| Membre 3 | DevOps Engineer | Dockerfile, docker-compose.yml, pipeline CI/CD, orchestration |
 
 ---
 
@@ -30,7 +30,7 @@ dev     ← Intégration : accumule les fonctionnalités validées
 ### Règles obligatoires
 
 - Jamais de commit direct sur `main`
-  - Tout développement passe par une branche `feature/<nirina/theo/fitia>-descriptif`
+- Tout développement passe par une branche `feature/<nom>`
 - Les Pull Requests doivent mentionner l'auteur et décrire le travail
 - Un reviewer minimum avant de merger sur `dev`
 - `main` ne reçoit que des merges depuis `dev` (ou `hotfix/`)
@@ -90,11 +90,11 @@ docs: add C4 architecture diagrams to audit report
    ```
 
 4. Ouvrir une Pull Request sur GitHub :
-    - **Titre** : `feat(scope): description` (même format que les commits)
-    - **Description** : ce qui a été fait, pourquoi, comment tester
-    - **Assignee** : l'auteur
-    - **Reviewer** : un autre membre de l'équipe
-    - **Base branch** : `dev` (jamais `main` directement)
+   - **Titre** : `feat(scope): description` (même format que les commits)
+   - **Description** : ce qui a été fait, pourquoi, comment tester
+   - **Assignee** : l'auteur
+   - **Reviewer** : un autre membre de l'équipe
+   - **Base branch** : `dev` (jamais `main` directement)
 
 5. Le reviewer approuve ou demande des modifications
 

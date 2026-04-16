@@ -1,0 +1,172 @@
+# ─── docker-compose.yml — SkillHub Stack Complète ────────────────────────────
+# Services : api (Laravel) + mysql:8 + mongodb:6 + nginx (reverse proxy)
+# Toutes les variables sensibles externalisées via .env (jamais en dur ici)
+# Lancer avec : docker compose up --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── API Laravel 12 ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: skillhub-api
+    restart: unless-stopped
+    # Variables d'environnement injectées depuis .env (jamais en dur)
+    environment:
+      APP_NAME: ${APP_NAME:-SkillHub}
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://localhost}
+      # Base de données MySQL
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-skillhub}
+      DB_USERNAME: ${DB_USERNAME:-skillhub}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # MongoDB pour messages et activity_logs
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DATABASE: ${MONGO_DATABASE:-skillhub_messages}
+      MONGO_USERNAME: ${MONGO_USERNAME:-}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:-}
+      # JWT — secret externalisé
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL: ${JWT_TTL:-60}
+      JWT_BLACKLIST_ENABLED: "true"
+      # Mail
+      MAIL_MAILER: ${MAIL_MAILER:-log}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-noreply@skillhub.com}
+      # CORS — origine externalisée (pas localhost:5173 en prod)
+      APP_CORS_ORIGIN: ${APP_CORS_ORIGIN:-http://localhost:5173}
+      # Cache et sessions
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - skillhub-network
+    volumes:
+      - api-storage:/var/www/html/storage
+      - api-media:/var/www/html/public/images
+    # Limites de ressources — cours p.176 orchestration
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "php", "-r", "echo 'ok';"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ─── Nginx — Reverse Proxy + SSL Termination ──────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: skillhub-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - api-media:/var/www/html/public/images:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - skillhub-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── MySQL 8 ──────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: skillhub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE:-skillhub}
+      MYSQL_USER: ${DB_USERNAME:-skillhub}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - skillhub-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    # Health check MySQL — requis par depends_on condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─── MongoDB 6 ────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:6.0
+    container_name: skillhub-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-skillhub_messages}
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - skillhub-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    # Health check MongoDB avec mongosh
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+# ─── Réseau interne isolé ─────────────────────────────────────────────────────
+networks:
+  skillhub-network:
+    driver: bridge
+    name: skillhub-network
+
+# ─── Volumes nommés pour la persistance ──────────────────────────────────────
+volumes:
+  mysql-data:
+    name: skillhub-mysql-data
+  mongodb-data:
+    name: skillhub-mongodb-data
+  api-storage:
+    name: skillhub-api-storage
+  api-media:
+    name: skillhub-api-media
