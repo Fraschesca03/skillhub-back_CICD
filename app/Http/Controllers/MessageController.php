@@ -12,49 +12,49 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 
 /**
- * Contrôleur de messagerie entre utilisateurs.
+ * Controleur de messagerie entre utilisateurs.
  */
 class MessageController extends Controller
 {
     /**
-     * Récupère le nombre de messages non lus de l'utilisateur connecté.
+     * Recupere le nombre de messages non lus de l utilisateur connecte.
      */
     public function nonLus(): JsonResponse
     {
         $user = $this->utilisateurConnecte();
-        if (! $user) return $this->reponseNonAutorise();
+        if (! $user) {
+            return $this->reponseNonAutorise();
+        }
 
         $count = Message::where('destinataire_id', $user->id)
-                        ->where('lu', false)
-                        ->count();
+            ->where('lu', false)
+            ->count();
 
         return response()->json(['non_lus' => $count]);
     }
 
     /**
-     * Récupère la liste des conversations de l'utilisateur connecté.
-     * Chaque conversation = un interlocuteur unique.
+     * Recupere la liste des conversations de l utilisateur connecte.
      */
     public function conversations(): JsonResponse
     {
         $user = $this->utilisateurConnecte();
-        if (! $user) return $this->reponseNonAutorise();
+        if (! $user) {
+            return $this->reponseNonAutorise();
+        }
 
-        // Récupère tous les messages impliquant l'utilisateur
         $messages = Message::where('expediteur_id', $user->id)
-                           ->orWhere('destinataire_id', $user->id)
-                           ->with(['expediteur', 'destinataire'])
-                           ->orderByDesc('created_at')
-                           ->get();
+            ->orWhere('destinataire_id', $user->id)
+            ->with(['expediteur', 'destinataire'])
+            ->orderByDesc('created_at')
+            ->get();
 
-        // Regroupe par interlocuteur (dernier message + nb non lus)
         $conversations = [];
 
         foreach ($messages as $message) {
-            // Détermine l'interlocuteur
             $interlocuteur = $message->expediteur_id === $user->id
-                           ? $message->destinataire
-                           : $message->expediteur;
+                ? $message->destinataire
+                : $message->expediteur;
 
             $id = $interlocuteur->id;
 
@@ -68,7 +68,6 @@ class MessageController extends Controller
                 ];
             }
 
-            // Compte les messages non lus de cet interlocuteur
             if ($message->destinataire_id === $user->id && ! $message->lu) {
                 $conversations[$id]['non_lus']++;
             }
@@ -78,44 +77,45 @@ class MessageController extends Controller
     }
 
     /**
-     * Récupère tous les messages d'une conversation avec un interlocuteur.
-     * Marque automatiquement les messages reçus comme lus.
+     * Recupere tous les messages d une conversation.
+     * Marque automatiquement les messages recus comme lus.
      */
     public function messagerie(int $interlocuteurId): JsonResponse
     {
         $user = $this->utilisateurConnecte();
-        if (! $user) return $this->reponseNonAutorise();
+        if (! $user) {
+            return $this->reponseNonAutorise();
+        }
 
-        // Récupère les messages entre les deux utilisateurs
         $messages = Message::where(function ($q) use ($user, $interlocuteurId) {
-                               $q->where('expediteur_id', $user->id)
-                                 ->where('destinataire_id', $interlocuteurId);
-                           })
-                           ->orWhere(function ($q) use ($user, $interlocuteurId) {
-                               $q->where('expediteur_id', $interlocuteurId)
-                                 ->where('destinataire_id', $user->id);
-                           })
-                           ->with(['expediteur:id,nom', 'destinataire:id,nom'])
-                           ->orderBy('created_at', 'asc')
-                           ->get();
+            $q->where('expediteur_id', $user->id)
+                ->where('destinataire_id', $interlocuteurId);
+        })
+            ->orWhere(function ($q) use ($user, $interlocuteurId) {
+                $q->where('expediteur_id', $interlocuteurId)
+                    ->where('destinataire_id', $user->id);
+            })
+            ->with(['expediteur:id,nom', 'destinataire:id,nom'])
+            ->orderBy('created_at', 'asc')
+            ->get();
 
-        // Marque les messages reçus non lus comme lus
         Message::where('expediteur_id', $interlocuteurId)
-               ->where('destinataire_id', $user->id)
-               ->where('lu', false)
-               ->update(['lu' => true]);
+            ->where('destinataire_id', $user->id)
+            ->where('lu', false)
+            ->update(['lu' => true]);
 
         return response()->json(['messages' => $messages]);
     }
 
     /**
-     * Envoie un nouveau message à un utilisateur.
-     * Envoie un mail si c'est le tout premier message de la conversation.
+     * Envoie un nouveau message a un utilisateur.
      */
     public function envoyer(Request $request): JsonResponse
     {
         $user = $this->utilisateurConnecte();
-        if (! $user) return $this->reponseNonAutorise();
+        if (! $user) {
+            return $this->reponseNonAutorise();
+        }
 
         $request->validate([
             'destinataire_id' => 'required|integer|exists:users,id',
@@ -125,16 +125,14 @@ class MessageController extends Controller
         $destinataireId = $request->input('destinataire_id');
         $contenu        = $request->input('contenu');
 
-        // Vérifie si c'est le premier message de cette conversation
         $estPremierMessage = ! Message::where(function ($q) use ($user, $destinataireId) {
             $q->where('expediteur_id', $user->id)
-              ->where('destinataire_id', $destinataireId);
+                ->where('destinataire_id', $destinataireId);
         })->orWhere(function ($q) use ($user, $destinataireId) {
             $q->where('expediteur_id', $destinataireId)
-              ->where('destinataire_id', $user->id);
+                ->where('destinataire_id', $user->id);
         })->exists();
 
-        // Crée et sauvegarde le message
         $message = Message::create([
             'expediteur_id'   => $user->id,
             'destinataire_id' => $destinataireId,
@@ -144,54 +142,45 @@ class MessageController extends Controller
 
         $message->load('expediteur:id,nom', 'destinataire:id,nom');
 
-        // Envoie un mail uniquement si c'est le premier message
         if ($estPremierMessage) {
             $destinataire = User::find($destinataireId);
             Mail::to($destinataire->email)
                 ->send(new NouveauMessageMail($user->nom, $destinataire->nom, $contenu));
         }
 
-        return response()->json([
-            'message'  => 'Message envoyé',
-            'data'     => $message,
-        ], 201);
+        return response()->json(['message' => 'Message envoyé', 'data' => $message], 201);
     }
 
     /**
-     * Retourne la liste des utilisateurs avec qui on peut échanger.
-     * Formateur → tous les apprenants inscrits à ses formations.
-     * Apprenant → tous ses formateurs.
+     * Retourne la liste des utilisateurs avec qui on peut echanger.
      */
     public function interlocuteurs(): JsonResponse
     {
         $user = $this->utilisateurConnecte();
-        if (! $user) return $this->reponseNonAutorise();
+        if (! $user) {
+            return $this->reponseNonAutorise();
+        }
 
         if ($user->role === 'formateur') {
-            // Les apprenants inscrits aux formations du formateur
             $utilisateurs = User::whereHas('inscriptions', function ($q) use ($user) {
                 $q->whereHas('formation', function ($q2) use ($user) {
                     $q2->where('formateur_id', $user->id);
                 });
             })->select('id', 'nom', 'email', 'role')->get();
         } else {
-            // Les formateurs des formations auxquelles l'apprenant est inscrit
             $utilisateurs = User::where('role', 'formateur')
-                                ->whereHas('formations', function ($q) use ($user) {
-                                    $q->whereHas('inscriptions', function ($q2) use ($user) {
-                                        $q2->where('utilisateur_id', $user->id);
-                                    });
-                                })->select('id', 'nom', 'email', 'role')->get();
+                ->whereHas('formations', function ($q) use ($user) {
+                    $q->whereHas('inscriptions', function ($q2) use ($user) {
+                        $q2->where('utilisateur_id', $user->id);
+                    });
+                })->select('id', 'nom', 'email', 'role')->get();
         }
 
         return response()->json(['interlocuteurs' => $utilisateurs]);
     }
 
-    // ─── Helpers privés ──────────────────────────────────────────
+    // ─── Helpers prives ──────────────────────────────────────────
 
-    /**
-     * Récupère l'utilisateur authentifié via JWT.
-     */
     private function utilisateurConnecte()
     {
         try {
@@ -201,9 +190,6 @@ class MessageController extends Controller
         }
     }
 
-    /**
-     * Réponse standard 401 non autorisé.
-     */
     private function reponseNonAutorise(): JsonResponse
     {
         return response()->json(['message' => 'Non autorisé'], 401);
