@@ -147,3 +147,10 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }} .
           docker push ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}
           echo "Image pushed: ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}"
+
+  - name: Verify coverage file content
+    run: |
+      echo "=== First lines of clover.xml ==="
+      head -20 build/logs/clover.xml
+      echo "=== Search for Windows paths ==="
+      grep -n "C:\\\\xampp" build/logs/clover.xml || true
