@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─── Stage 1 : Builder — installation des dépendances Composer ───────────────
-FROM composer:2.7-alpine AS builder
+FROM composer:2.7 AS builder
 
 WORKDIR /app
 
