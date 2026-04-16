@@ -96,4 +96,24 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
       - name: Build image Docker
-        run: docker build -t skillhub-api:${{ github.sha }} .
+        run: docker build -t skillhub-api:${{ github.sha }} 
+
+        deploy:
+    name: Push vers Docker Hub
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+      - name: Connexion a Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build et Push image Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/skillhub-api:${{ github.sha }}.
