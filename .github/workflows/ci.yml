@@ -43,6 +43,7 @@ jobs:
           php-version: "8.2"
           extensions: pdo, pdo_mysql, mbstring, exif, bcmath, gd, mongodb-2.2.1
           coverage: xdebug
+          ini-values: xdebug.mode=coverage
 
       - name: Verify mongodb extension version
         run: php -r "echo phpversion('mongodb');"
@@ -62,23 +63,30 @@ jobs:
           vendor/bin/phpcs --standard=PSR12 --ignore=app/Http/Middleware,app/Providers,app/Mail,app/Console app/ || true
 
       - name: Test - PHPUnit with coverage
+        env:
+          XDEBUG_MODE: coverage
+          APP_ENV: testing
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: skillhub_db
+          DB_USERNAME: skillhub_user
+          DB_PASSWORD: skillhub_pass
+          MONGO_HOST: 127.0.0.1
+          MONGO_PORT: 27017
+          MONGO_DATABASE: skillhub_logs
         run: |
           set -a && source .env && set +a
-          export DB_CONNECTION=mysql
-          export DB_HOST=127.0.0.1
-          export DB_PORT=3306
-          export DB_DATABASE=skillhub_db
-          export DB_USERNAME=skillhub_user
-          export DB_PASSWORD=skillhub_pass
-          export MONGO_HOST=127.0.0.1
-          export MONGO_PORT=27017
-          export MONGO_DATABASE=skillhub_logs
-          export APP_ENV=testing
           mkdir -p build/logs
-          php -d xdebug.mode=coverage artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
+          php artisan test \
+            --coverage-clover=build/logs/clover.xml \
+            --log-junit=build/logs/junit.xml
 
       - name: Verify coverage reports exist
-        run: ls -la build/logs/
+        run: |
+          ls -la build/logs/
+          echo "Lines in clover.xml:"
+          wc -l build/logs/clover.xml
 
       - name: Build Docker image
         run: docker build -t skillhub-api:${{ github.sha }} .
