@@ -1,140 +1,180 @@
-# Guide de contribution — SkillHub Backend
+# CONTRIBUTING.md — SkillHub Backend
 
-## Repartition des roles
-
-| Role | Membre | Responsabilites |
-|------|--------|-----------------|
-| Cloud Architect | Fitia  | Rapport d audit cloud, comparaison fournisseurs, schema C4, plan budgetaire |
-| DevOps Engineer | Nirina | Dockerfiles, docker-compose.yml, pipeline CI/CD GitHub Actions |
-| Tech Lead | Theo   | Versionning Git, CONTRIBUTING.md, README.md, orchestration, securite |
+Guide de contribution pour le projet SkillHub (Bloc 03 — Cloud, DevOps et Architecture).
 
 ---
 
-## Strategie de branches
+## Répartition des rôles
+
+| Membre | Rôle | Responsabilités principales |
+|--------|------|-----------------------------|
+| Theo   | Tech Lead | Versionning Git, README, CONTRIBUTING, coordination, SonarCloud |
+| Fitia  | Cloud Architect | Rapport d'audit, schéma C4, plan budgétaire, comparaison cloud |
+| Nirina | DevOps Engineer | Dockerfile, docker-compose.yml, pipeline CI/CD, orchestration |
+
+---
+
+## Stratégie de branches
 
 ```
-main        Production stable — aucun commit direct autorise
-dev         Integration — branche de travail par defaut
-feature/*   Une branche par fonctionnalite ou tache DevOps
-hotfix/*    Correctifs urgents sur main (merge aussi sur dev)
+main    ← Production : code stable uniquement, aucun commit direct
+ │
+dev     ← Intégration : accumule les fonctionnalités validées
+ │
+ ├── feature/nom-feature    ← Développement d'une fonctionnalité
+ ├── feature/docker-api     ← Exemple : ajout Dockerfile API
+ ├── feature/ci-pipeline    ← Exemple : configuration GitHub Actions
+ └── hotfix/nom-fix         ← Correctifs urgents → merge vers main ET dev
 ```
 
-### Creer une branche de fonctionnalite
+### Règles obligatoires
 
-```bash
-git checkout dev
-git pull origin dev
-git checkout -b feature/nom-de-la-fonctionnalite
-```
-
-### Fusionner via Pull Request
-
-1. Pousser la branche feature
-2. Ouvrir une Pull Request vers `dev`
-3. Decrire le travail effectue dans la PR
-4. Attendre la validation du pipeline CI
-5. Merger apres review
+- Jamais de commit direct sur `main`
+  - Tout développement passe par une branche `feature/<nirina/theo/fitia>-descriptif`
+- Les Pull Requests doivent mentionner l'auteur et décrire le travail
+- Un reviewer minimum avant de merger sur `dev`
+- `main` ne reçoit que des merges depuis `dev` (ou `hotfix/`)
 
 ---
 
 ## Format des commits (Conventional Commits)
 
-Tous les commits doivent suivre ce format :
-
 ```
-<type>(<scope>): <description courte en anglais>
+<type>(<scope>): <description courte>
+
+[corps optionnel]
+
+[footer optionnel]
 ```
 
-### Types acceptes
+### Types autorisés
 
-| Type | Usage |
-|------|-------|
-| `feat` | Nouvelle fonctionnalite |
-| `fix` | Correction de bug |
-| `docker` | Ajout ou modification Docker |
-| `ci` | Modification du pipeline CI/CD |
-| `docs` | Documentation uniquement |
-| `chore` | Maintenance, mise a jour dependances |
-| `test` | Ajout ou modification de tests |
+| Type | Usage | Exemple |
+|------|-------|---------|
+| `feat` | Nouvelle fonctionnalité | `feat(api): add JWT authentication middleware` |
+| `fix` | Correction de bug | `fix: resolve port conflict in docker-compose.yml` |
+| `docker` | Fichiers de conteneurisation | `docker: add multi-stage Dockerfile for API` |
+| `ci` | Pipeline CI/CD | `ci: configure GitHub Actions with lint and test stages` |
+| `docs` | Documentation | `docs: update README with docker compose up instructions` |
+| `test` | Ajout ou correction de tests | `test: add CoverageTest for FormationController` |
+| `chore` | Maintenance | `chore: update composer dependencies` |
+| `refactor` | Refactoring sans changement fonctionnel | `refactor: extract JWT helper to base controller` |
 
-### Exemples corrects
+### Exemples concrets du projet
 
 ```bash
-feat(api): add JWT authentication middleware
-fix: resolve port conflict in docker-compose.yml
-docker: add multi-stage Dockerfile for Laravel backend
-ci: configure GitHub Actions with lint and test stages
-docs: update README with docker compose up instructions
-chore: update composer dependencies
-test: add coverage for InscriptionController
-```
-
-### Exemples incorrects
-
-```bash
-# Trop vague
-update files
-fixed bug
-wip
-
-# Pas en Conventional Commits
-Ajout du Dockerfile
+feat(auth): add profile photo upload endpoint
+fix(cors): externalize allowed origin to APP_CORS_ORIGIN env variable
+docker: add nginx reverse proxy service to docker-compose.yml
+ci: pin ext-mongodb to 2.2.0 to match composer.lock
+test: add MessageTest to cover MessageController endpoints
+docs: add C4 architecture diagrams to audit report
 ```
 
 ---
 
-## Procedure de Pull Request
+## Procédure de Pull Request
 
-1. **Titre** : suivre le format Conventional Commits (`feat(api): ...`)
-2. **Description** : expliquer ce qui a ete fait et pourquoi
-3. **Branch source** : toujours depuis `feature/*` ou `hotfix/*`
-4. **Branch cible** : `dev` (jamais directement `main`)
-5. **Pipeline CI** : la PR ne peut pas etre mergee si le pipeline echoue
-6. **Review** : au moins un autre membre doit approuver
+1. Créer une branche depuis `dev` :
+   ```bash
+   git checkout dev
+   git pull origin dev
+   git checkout -b feature/nom-descriptif
+   ```
+
+2. Développer et commiter avec Conventional Commits
+
+3. Pousser la branche :
+   ```bash
+   git push origin feature/nom-descriptif
+   ```
+
+4. Ouvrir une Pull Request sur GitHub :
+    - **Titre** : `feat(scope): description` (même format que les commits)
+    - **Description** : ce qui a été fait, pourquoi, comment tester
+    - **Assignee** : l'auteur
+    - **Reviewer** : un autre membre de l'équipe
+    - **Base branch** : `dev` (jamais `main` directement)
+
+5. Le reviewer approuve ou demande des modifications
+
+6. Merger uniquement après approbation et pipeline CI vert
 
 ---
 
-## Procedure de resolution de conflits
+## Procédure de résolution de conflits
 
 ```bash
-# 1. Mettre a jour dev en local
+# 1. Mettre à jour dev localement
 git checkout dev
 git pull origin dev
 
-# 2. Rebaser votre branche feature sur dev
-git checkout feature/ma-fonctionnalite
+# 2. Rebaser la branche feature sur dev
+git checkout feature/ma-branche
 git rebase dev
 
-# 3. Resoudre les conflits fichier par fichier
-# Puis marquer comme resolus
-git add <fichier-resolu>
+# 3. Résoudre les conflits fichier par fichier
+# Éditer les fichiers conflictuels, puis :
+git add fichier-conflit.php
 git rebase --continue
 
-# 4. Pousser la branche rebasee
-git push origin feature/ma-fonctionnalite --force-with-lease
+# 4. Forcer le push de la branche rebasée
+git push --force-with-lease origin feature/ma-branche
+```
+
+En cas de conflit complexe, contacter le Tech Lead avant de forcer un merge.
+
+---
+
+## Lancer les tests localement
+
+```bash
+# Tests complets avec couverture
+php artisan test --coverage-clover=build/logs/clover.xml
+
+# Tests d'un fichier spécifique
+php artisan test --filter=SkillHubTest
+php artisan test --filter=MessageTest
+php artisan test --filter=CoverageTest
+
+# Lint PHP (syntaxe)
+find app routes -name "*.php" | xargs php -l
 ```
 
 ---
 
-## Regles de securite
+## Lancer l'application avec Docker
 
-- Ne jamais commiter de fichier `.env`
-- Ne jamais mettre de credentials en clair dans les Dockerfiles ou le pipeline
-- Toutes les valeurs sensibles sont dans les GitHub Actions Secrets
-- Images Docker taguees avec le git SHA, pas `latest` uniquement
+```bash
+# Démarrage complet (API + MySQL + MongoDB)
+docker compose up --build
+
+# En arrière-plan
+docker compose up -d --build
+
+# Voir les logs
+docker compose logs -f api
+
+# Arrêter
+docker compose down
+```
 
 ---
 
-## Lancer les tests avant de pusher
+## Variables d'environnement requises
 
+Copier `.env.example` en `.env` et renseigner toutes les valeurs.
+Ne jamais commiter `.env` (protégé par `.gitignore`).
+
+---
+
+## Quality Gate SonarCloud
+
+Le pipeline bloque si :
+- Couverture de code sur le nouveau code < 80 %
+- Issues critiques introduites > 0
+
+Vérifier localement avant de pousser :
 ```bash
-# Tests rapides
-php artisan test
-
-# Tests avec couverture
-mkdir -p build/logs
-php artisan test --coverage-clover=build/logs/clover.xml
-
-# Lint PSR-12
-~/.composer/vendor/bin/phpcs --standard=PSR12 --extensions=php app/
+php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
 ```
