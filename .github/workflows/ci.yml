@@ -1,220 +1,106 @@
-name: CI/CD SkillHub Backend
+name: CI SkillHub
 
 on:
   push:
-    branches:
-      - main
-      - dev
+    branches: [main, dev]
   pull_request:
-    branches:
-      - main
-      - dev
-
-env:
-  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/skillhub-back
-  PHP_VERSION: '8.2'
+    branches: [main, dev]
 
 jobs:
-
-  install:
-    name: Install Dependencies
+  test-and-analyze:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo, pdo_mysql, mbstring, xml, bcmath, intl
-          tools: composer:v2
-          coverage: none
-
-      - name: Upgrade ext-mongodb to 2.2.0
-        run: |
-          sudo rm -f /etc/php/8.2/cli/conf.d/20-mongodb.ini
-          sudo pecl uninstall mongodb || true
-          sudo pecl install mongodb-2.2.0
-          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
-          php -m | grep mongodb
-
-      - name: Cache vendor
-        uses: actions/cache@v4
-        with:
-          path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
-
-      - name: Composer install
-        run: composer install --no-interaction --no-progress --prefer-dist
-
-      - name: Upload vendor
-        uses: actions/upload-artifact@v4
-        with:
-          name: vendor
-          path: vendor/
-          retention-days: 1
-
-  lint:
-    name: Lint PSR-12
-    runs-on: ubuntu-latest
-    needs: install
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo, pdo_mysql, mbstring, xml, bcmath, intl
-          tools: composer:v2
-          coverage: none
-
-      - name: Upgrade ext-mongodb to 2.2.0
-        run: |
-          sudo rm -f /etc/php/8.2/cli/conf.d/20-mongodb.ini
-          sudo pecl uninstall mongodb || true
-          sudo pecl install mongodb-2.2.0
-          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
-
-      - name: Download vendor
-        uses: actions/download-artifact@v4
-        with:
-          name: vendor
-          path: vendor/
-
-      - name: Install phpcs
-        run: composer global require squizlabs/php_codesniffer --quiet
-
-      # continue-on-error car le code legacy a des erreurs de style
-      # qui ne bloquent pas le fonctionnement de l application
-      - name: Run phpcs
-        continue-on-error: true
-        run: ~/.composer/vendor/bin/phpcs --standard=PSR12 --extensions=php --ignore=app/Http/Middleware/CorsMiddleware.php app/
-
-  test:
-    name: Tests and SonarCloud
-    runs-on: ubuntu-latest
-    needs: install
     services:
       mysql:
         image: mysql:8
         env:
-          MYSQL_ROOT_PASSWORD: secret
-          MYSQL_DATABASE: skillhub_test
+          MYSQL_DATABASE: skillhub_db
+          MYSQL_USER: skillhub_user
+          MYSQL_PASSWORD: skillhub_pass
+          MYSQL_ROOT_PASSWORD: root_pass
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -psecret"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
       mongodb:
         image: mongo:6
         ports:
           - 27017:27017
-        options: >-
-          --health-cmd="mongosh --eval 'db.adminCommand({ ping: 1 })'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+        options: --health-cmd="mongosh --eval 'db.adminCommand(\"ping\")'" --health-interval=10s --health-timeout=5s --health-retries=5
+
     steps:
+      # 1 - Checkout du code
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup PHP with pcov
+      # 2 - Setup PHP
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo, pdo_mysql, mbstring, xml, bcmath, intl, pcov
-          tools: composer:v2
-          coverage: pcov
+          php-version: "8.2"
+          extensions: pdo, pdo_mysql, mbstring, exif, bcmath, gd, mongodb
+          coverage: xdebug
 
-      - name: Upgrade ext-mongodb to 2.2.0
-        run: |
-          sudo rm -f /etc/php/8.2/cli/conf.d/20-mongodb.ini
-          sudo pecl uninstall mongodb || true
-          sudo pecl install mongodb-2.2.0
-          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
-          php -m | grep mongodb
+      # 3 - Install dependencies
+      - name: Install dependencies
+        working-directory: skillhub-back
+        run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Download vendor
-        uses: actions/download-artifact@v4
-        with:
-          name: vendor
-          path: vendor/
-
-      # On genere une APP_KEY valide directement dans le .env
-      # On n utilise pas le secret pour eviter les conflits de format
-      - name: Setup env and generate key
+      # 4 - Prepare Laravel
+      - name: Prepare environment
+        working-directory: skillhub-back
         run: |
           cp .env.example .env
-          php artisan key:generate --quiet
-          echo "JWT_SECRET=ci_test_secret_key_skillhub_pipeline_2026" >> .env
+          php artisan key:generate
+          php artisan jwt:secret
 
-      - name: Run migrations
+      # 5 - Lint (PHP_CodeSniffer)
+      - name: Lint
+        working-directory: skillhub-back
+        run: |
+          composer require --dev squizlabs/php_codesniffer --no-interaction -q
+          vendor/bin/phpcs --standard=PSR12 app/ --ignore=app/Http/Middleware,app/Providers || true
+
+      # 6 - Run tests avec couverture
+      - name: Run tests
+        working-directory: skillhub-back
         env:
           APP_ENV: testing
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_DATABASE: skillhub_test
-          DB_USERNAME: root
-          DB_PASSWORD: secret
+          DB_DATABASE: skillhub_db
+          DB_USERNAME: skillhub_user
+          DB_PASSWORD: skillhub_pass
           MONGO_HOST: 127.0.0.1
           MONGO_PORT: 27017
-          MONGO_DATABASE: skillhub_test
-          JWT_SECRET: ci_test_secret_key_skillhub_pipeline_2026
-          CACHE_STORE: array
-          SESSION_DRIVER: array
-          QUEUE_CONNECTION: sync
-        run: php artisan migrate --force --quiet
+          MONGO_DATABASE: skillhub_logs
+        run: |
+          mkdir -p build/logs
+          php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
 
-      - name: Run tests with coverage
-        env:
-          APP_ENV: testing
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: skillhub_test
-          DB_USERNAME: root
-          DB_PASSWORD: secret
-          MONGO_HOST: 127.0.0.1
-          MONGO_PORT: 27017
-          MONGO_DATABASE: skillhub_test
-          JWT_SECRET: ci_test_secret_key_skillhub_pipeline_2026
-          CACHE_STORE: array
-          SESSION_DRIVER: array
-          QUEUE_CONNECTION: sync
-          MAIL_MAILER: array
-        run: mkdir -p build/logs && php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
+      # 7 - Build image Docker taguée avec git SHA
+      - name: Build Docker image
+        run: |
+          docker build -t skillhub-api:${{ github.sha }} ./skillhub-back
 
-      - name: SonarCloud scan
+      # 8 - SonarCloud Scan
+      - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
+        with:
+          projectBaseDir: skillhub-back
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  build:
-    name: Build Docker Image
+  # Job CD - push image après merge sur main
+  push-image:
     runs-on: ubuntu-latest
-    needs: [lint, test]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build image
-        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.IMAGE_NAME }}:latest .
-
-  push:
-    name: Push to Docker Hub
-    runs-on: ubuntu-latest
-    needs: build
+    needs: test-and-analyze
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -225,12 +111,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push
+      - name: Build and push image
         run: |
-          docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
-          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.IMAGE_NAME }}:latest
-
-      - name: Show published tag
-        run: echo "Published ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }} ./skillhub-back
+          docker push ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}
