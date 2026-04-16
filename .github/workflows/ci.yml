@@ -75,10 +75,19 @@ jobs:
           export MONGO_DATABASE=skillhub_logs
           export APP_ENV=testing
           mkdir -p build/logs
-          php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
+          php -d xdebug.mode=coverage artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
+
+      - name: Verify coverage reports exist
+        run: ls -la build/logs/
 
       - name: Build Docker image
         run: docker build -t skillhub-api:${{ github.sha }} .
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: build/logs/
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
@@ -107,3 +116,4 @@ jobs:
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }} .
           docker push ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}
+          echo "Image pushed: ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}"
