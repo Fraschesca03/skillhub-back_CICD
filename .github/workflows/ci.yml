@@ -1,6 +1,5 @@
 name: CI - SkillHub Backend
 
-# Declenchement sur push et pull request vers main et dev
 on:
   push:
     branches: [main, dev]
@@ -9,13 +8,11 @@ on:
 
 jobs:
 
-  # ─── Job 1 : Lint + Tests + SonarCloud ───────────────────────
   test:
     name: Lint, Tests et Couverture
     runs-on: ubuntu-latest
 
     services:
-      # Service MongoDB pour les tests MessageController et ActivityLog
       mongodb:
         image: mongo:6
         ports:
@@ -27,22 +24,18 @@ jobs:
           --health-retries 5
 
     steps:
-      # Etape 1 : Recuperation du code avec tout l historique (requis par SonarCloud)
       - name: Checkout du code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Etape 2 : Installation de PHP 8.2 avec les extensions necessaires
       - name: Installation de PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: mbstring, xml, pdo_sqlite, mongodb-2.2.0, pcov, gd
           coverage: pcov
-          tools: phpcs
 
-      # Etape 3 : Cache des dependances Composer
       - name: Cache Composer
         uses: actions/cache@v4
         with:
@@ -50,39 +43,45 @@ jobs:
           key: composer-${{ hashFiles('composer.lock') }}
           restore-keys: composer-
 
-      # Etape 4 : Installation des dependances PHP
       - name: Installation des dependances
         run: composer install --prefer-dist --no-progress --no-interaction
 
-      # Etape 5 : Lint - verification syntaxique PHP
       - name: Lint PHP
         run: find app routes -name "*.php" | xargs php -l
 
-      # Etape 6 : Preparation de l environnement de test
-      - name: Copie du fichier .env.testing
-        run: cp .env.testing .env
+      - name: Generation du fichier .env
+        run: |
+          printf 'APP_NAME=SkillHub\n' > .env
+          printf 'APP_ENV=testing\n' >> .env
+          printf 'APP_KEY=\n' >> .env
+          printf 'APP_DEBUG=true\n' >> .env
+          printf 'APP_URL=http://localhost\n' >> .env
+          printf 'DB_CONNECTION=sqlite\n' >> .env
+          printf 'DB_DATABASE=:memory:\n' >> .env
+          printf 'MONGO_HOST=127.0.0.1\n' >> .env
+          printf 'MONGO_PORT=27017\n' >> .env
+          printf 'MONGO_DATABASE=skillhub_test\n' >> .env
+          printf 'JWT_SECRET=skillhub_ci_test_secret_key_32chars_ok\n' >> .env
+          printf 'JWT_TTL=60\n' >> .env
+          printf 'JWT_REFRESH_TTL=20160\n' >> .env
+          printf 'JWT_BLACKLIST_ENABLED=true\n' >> .env
+          printf 'MAIL_MAILER=array\n' >> .env
+          printf 'CACHE_STORE=array\n' >> .env
+          printf 'QUEUE_CONNECTION=sync\n' >> .env
+          printf 'SESSION_DRIVER=array\n' >> .env
 
       - name: Generation de la cle applicative
         run: php artisan key:generate
 
-      # Etape 7 : Migration de la base de donnees SQLite en memoire
       - name: Migration base de donnees
         run: php artisan migrate --force
 
-      # Etape 8 : Creation du dossier pour les rapports de tests
       - name: Creation du dossier build/logs
         run: mkdir -p build/logs
 
-      # Etape 9 : Execution des tests avec generation du rapport de couverture
       - name: Tests avec couverture de code
         run: php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
-        env:
-          XDEBUG_MODE: coverage
 
-      # CORRECTION DU BUG 404 :
-      # sonarcloud-github-action@master utilise le scanner 7.0.2 qui appelle
-      # /api.sonarcloud.io/analysis/analyses — endpoint inexistant = 404.
-      # sonarqube-scan-action@v4 utilise le scanner 6.2.1 qui n a pas ce bug.
       - name: Analyse SonarCloud
         uses: SonarSource/sonarqube-scan-action@v4
         env:
@@ -93,7 +92,6 @@ jobs:
             -Dsonar.php.coverage.reportPaths=build/logs/clover.xml
             -Dsonar.php.tests.reportPath=build/logs/junit.xml
 
-  # ─── Job 2 : Build de l image Docker ────────────────────────
   build:
     name: Build Image Docker
     runs-on: ubuntu-latest
@@ -103,30 +101,25 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # Construction de l image taguee avec le SHA du commit
       - name: Build image Docker
         run: docker build -t skillhub-api:${{ github.sha }} .
 
-  # ─── Job 3 : CD - Push vers Docker Hub (main uniquement) ────
   deploy:
     name: Push vers Docker Hub
     runs-on: ubuntu-latest
     needs: build
-    # Le CD se declenche uniquement sur merge vers main
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # Connexion a Docker Hub via les secrets du pipeline
       - name: Connexion a Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build et push de l image avec le SHA comme tag
       - name: Build et Push image Docker
         uses: docker/build-push-action@v6
         with:
