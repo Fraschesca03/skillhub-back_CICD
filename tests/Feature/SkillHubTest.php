@@ -12,26 +12,15 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 
 /**
  * Tests fonctionnels de l'API SkillHub.
- *
- * Couvre :
- * - Authentification (register, login, profile, logout)
- * - Formations (CRUD formateur, contrôle rôle)
- * - Modules (CRUD formateur, contrôle rôle et propriété)
- * - Inscriptions (inscription, doublon, désinscription, mes formations)
- * - Progression (terminer module, doublon, calcul pourcentage)
- * - Erreurs attendues (401, 403, 404, 409)
  */
 class SkillHubTest extends TestCase
 {
     use RefreshDatabase;
 
     // -------------------------------------------------------------------------
-    // Helpers privés
+    // Helpers prives
     // -------------------------------------------------------------------------
 
-    /**
-     * Crée un utilisateur et retourne son token JWT.
-     */
     private function creerUtilisateur(string $role): array
     {
         $user = User::create([
@@ -46,9 +35,6 @@ class SkillHubTest extends TestCase
         return ['user' => $user, 'token' => $token];
     }
 
-    /**
-     * Crée une formation appartenant au formateur donné.
-     */
     private function creerFormation(User $formateur): Formation
     {
         return Formation::create([
@@ -61,9 +47,6 @@ class SkillHubTest extends TestCase
         ]);
     }
 
-    /**
-     * Crée un module pour la formation donnée.
-     */
     private function creerModule(Formation $formation, int $ordre = 1): Module
     {
         return Module::create([
@@ -74,19 +57,16 @@ class SkillHubTest extends TestCase
         ]);
     }
 
-    /**
-     * Construit l'en-tête Authorization avec le token JWT.
-     */
     private function headers(string $token): array
     {
         return ['Authorization' => 'Bearer ' . $token];
     }
 
     // =========================================================================
-    // SECTION 1 — Authentification
+    // SECTION 1 - Authentification
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_utilisateur_peut_sinscrire(): void
     {
         $response = $this->postJson('/api/register', [
@@ -100,7 +80,7 @@ class SkillHubTest extends TestCase
             ->assertJsonStructure(['message', 'token', 'user']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function linscription_echoue_si_email_deja_utilise(): void
     {
         $this->creerUtilisateur('apprenant');
@@ -115,7 +95,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(422);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_utilisateur_peut_se_connecter(): void
     {
         $this->creerUtilisateur('formateur');
@@ -129,7 +109,7 @@ class SkillHubTest extends TestCase
             ->assertJsonStructure(['message', 'token', 'user']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function la_connexion_echoue_avec_mauvais_mot_de_passe(): void
     {
         $this->creerUtilisateur('formateur');
@@ -142,7 +122,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_utilisateur_connecte_peut_voir_son_profil(): void
     {
         ['token' => $token] = $this->creerUtilisateur('apprenant');
@@ -153,7 +133,7 @@ class SkillHubTest extends TestCase
             ->assertJsonStructure(['user']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function le_profil_retourne_401_sans_token(): void
     {
         $response = $this->getJson('/api/profile');
@@ -161,7 +141,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_utilisateur_peut_se_deconnecter(): void
     {
         ['token' => $token] = $this->creerUtilisateur('apprenant');
@@ -173,10 +153,10 @@ class SkillHubTest extends TestCase
     }
 
     // =========================================================================
-    // SECTION 2 — Formations
+    // SECTION 2 - Formations
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_peut_creer_une_formation(): void
     {
         ['token' => $token] = $this->creerUtilisateur('formateur');
@@ -192,7 +172,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Formation créée avec succès']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_apprenant_ne_peut_pas_creer_de_formation(): void
     {
         ['token' => $token] = $this->creerUtilisateur('apprenant');
@@ -207,7 +187,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function la_liste_des_formations_est_publique(): void
     {
         $response = $this->getJson('/api/formations');
@@ -216,7 +196,7 @@ class SkillHubTest extends TestCase
             ->assertJsonStructure([]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function on_peut_voir_une_formation_existante(): void
     {
         ['user' => $formateur] = $this->creerUtilisateur('formateur');
@@ -228,7 +208,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['titre' => 'Formation Test']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function la_vue_dune_formation_inexistante_retourne_404(): void
     {
         $response = $this->getJson('/api/formations/9999');
@@ -236,7 +216,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_peut_modifier_sa_formation(): void
     {
         ['user' => $formateur, 'token' => $token] = $this->creerUtilisateur('formateur');
@@ -253,7 +233,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Formation mise à jour avec succès']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_ne_peut_pas_modifier_la_formation_dun_autre(): void
     {
         ['user' => $formateur1] = $this->creerUtilisateur('formateur');
@@ -277,7 +257,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_peut_supprimer_sa_formation(): void
     {
         ['user' => $formateur, 'token' => $token] = $this->creerUtilisateur('formateur');
@@ -290,10 +270,10 @@ class SkillHubTest extends TestCase
     }
 
     // =========================================================================
-    // SECTION 3 — Modules
+    // SECTION 3 - Modules
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_peut_ajouter_un_module_a_sa_formation(): void
     {
         ['user' => $formateur, 'token' => $token] = $this->creerUtilisateur('formateur');
@@ -309,7 +289,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Module créé avec succès']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_apprenant_ne_peut_pas_creer_un_module(): void
     {
         ['user' => $formateur] = $this->creerUtilisateur('formateur');
@@ -326,7 +306,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function la_creation_de_module_sans_token_retourne_401(): void
     {
         ['user' => $formateur] = $this->creerUtilisateur('formateur');
@@ -341,7 +321,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function on_peut_lister_les_modules_dune_formation(): void
     {
         ['user' => $formateur] = $this->creerUtilisateur('formateur');
@@ -355,7 +335,7 @@ class SkillHubTest extends TestCase
             ->assertJsonCount(2);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_peut_modifier_un_module_de_sa_formation(): void
     {
         ['user' => $formateur, 'token' => $token] = $this->creerUtilisateur('formateur');
@@ -372,7 +352,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Module mis à jour avec succès']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_peut_supprimer_un_module_de_sa_formation(): void
     {
         ['user' => $formateur, 'token' => $token] = $this->creerUtilisateur('formateur');
@@ -385,7 +365,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Module supprimé avec succès']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function la_modification_dun_module_inexistant_retourne_404(): void
     {
         ['token' => $token] = $this->creerUtilisateur('formateur');
@@ -400,10 +380,10 @@ class SkillHubTest extends TestCase
     }
 
     // =========================================================================
-    // SECTION 4 — Inscriptions
+    // SECTION 4 - Inscriptions
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_apprenant_peut_sinscrire_a_une_formation(): void
     {
         ['user' => $formateur]       = $this->creerUtilisateur('formateur');
@@ -416,7 +396,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Inscription réussie']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function linscription_en_double_retourne_409(): void
     {
         ['user' => $formateur]                    = $this->creerUtilisateur('formateur');
@@ -429,7 +409,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(409);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_ne_peut_pas_sinscrire_a_une_formation(): void
     {
         ['user' => $formateur, 'token' => $token] = $this->creerUtilisateur('formateur');
@@ -440,7 +420,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function linscription_a_une_formation_inexistante_retourne_404(): void
     {
         ['token' => $token] = $this->creerUtilisateur('apprenant');
@@ -450,7 +430,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_apprenant_peut_se_desinscrire(): void
     {
         ['user' => $formateur]                    = $this->creerUtilisateur('formateur');
@@ -469,7 +449,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Désinscription réussie']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_apprenant_voit_ses_formations_inscrites(): void
     {
         ['user' => $formateur]                    = $this->creerUtilisateur('formateur');
@@ -489,10 +469,10 @@ class SkillHubTest extends TestCase
     }
 
     // =========================================================================
-    // SECTION 5 — Progression
+    // SECTION 5 - Progression
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_apprenant_peut_terminer_un_module(): void
     {
         ['user' => $formateur]                    = $this->creerUtilisateur('formateur');
@@ -515,7 +495,7 @@ class SkillHubTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function la_progression_est_calculee_correctement_sur_plusieurs_modules(): void
     {
         ['user' => $formateur]                    = $this->creerUtilisateur('formateur');
@@ -537,7 +517,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['progression' => 50]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function terminer_un_module_deja_termine_retourne_un_message_sans_erreur(): void
     {
         ['user' => $formateur]                    = $this->creerUtilisateur('formateur');
@@ -558,7 +538,7 @@ class SkillHubTest extends TestCase
             ->assertJsonFragment(['message' => 'Ce module est déjà terminé']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function terminer_un_module_sans_etre_inscrit_retourne_403(): void
     {
         ['user' => $formateur]       = $this->creerUtilisateur('formateur');
@@ -571,7 +551,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function un_formateur_ne_peut_pas_terminer_un_module(): void
     {
         ['user' => $formateur, 'token' => $token] = $this->creerUtilisateur('formateur');
@@ -583,7 +563,7 @@ class SkillHubTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function terminer_un_module_inexistant_retourne_404(): void
     {
         ['user' => $formateur]                    = $this->creerUtilisateur('formateur');
