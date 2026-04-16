@@ -99,7 +99,12 @@ jobs:
           mkdir -p build/logs
           XDEBUG_MODE=coverage php -d xdebug.mode=coverage ./vendor/bin/phpunit \
             --coverage-clover=build/logs/clover.xml \
-            --log-junit=build/logs/junit.xml
+            --log-junit=build/logs/junit.xml \
+            --coverage-filter=app
+
+      - name: Normalize coverage paths
+        run: |
+          sed -i 's|/home/runner/work/.*/skillhub-back_CICD/||g' build/logs/clover.xml
 
       - name: Verify coverage file content
         run: |
