@@ -66,6 +66,7 @@ jobs:
         env:
           XDEBUG_MODE: coverage
           APP_ENV: testing
+          APP_KEY: ""
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
@@ -76,7 +77,11 @@ jobs:
           MONGO_PORT: 27017
           MONGO_DATABASE: skillhub_logs
         run: |
-          set -a && source .env && set +a
+          # Extraire seulement APP_KEY et JWT_SECRET du .env genere
+          APP_KEY_VALUE=$(grep '^APP_KEY=' .env | cut -d'=' -f2-)
+          JWT_SECRET_VALUE=$(grep '^JWT_SECRET=' .env | cut -d'=' -f2-)
+          export APP_KEY="$APP_KEY_VALUE"
+          export JWT_SECRET="$JWT_SECRET_VALUE"
           mkdir -p build/logs
           php artisan test \
             --coverage-clover=build/logs/clover.xml \
@@ -85,7 +90,6 @@ jobs:
       - name: Verify coverage reports exist
         run: |
           ls -la build/logs/
-          echo "Lines in clover.xml:"
           wc -l build/logs/clover.xml
 
       - name: Build Docker image
