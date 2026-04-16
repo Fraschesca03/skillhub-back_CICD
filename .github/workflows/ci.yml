@@ -56,6 +56,18 @@ jobs:
           cp .env.example .env
           php artisan key:generate
           php artisan jwt:secret --force
+          # Ecraser les credentials DB dans le .env avec les valeurs CI
+          sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
+          sed -i "s|^DB_HOST=.*|DB_HOST=127.0.0.1|" .env
+          sed -i "s|^DB_PORT=.*|DB_PORT=3306|" .env
+          sed -i "s|^DB_DATABASE=.*|DB_DATABASE=skillhub_db|" .env
+          sed -i "s|^DB_USERNAME=.*|DB_USERNAME=skillhub_user|" .env
+          sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=skillhub_pass|" .env
+          sed -i "s|^MONGO_HOST=.*|MONGO_HOST=127.0.0.1|" .env
+          sed -i "s|^MONGO_PORT=.*|MONGO_PORT=27017|" .env
+          sed -i "s|^MONGO_DATABASE=.*|MONGO_DATABASE=skillhub_logs|" .env
+          echo "=== Verification .env ==="
+          grep -E "^DB_|^MONGO_|^JWT_|^APP_KEY" .env
 
       - name: Lint - PHP_CodeSniffer PSR-12
         run: |
@@ -65,21 +77,7 @@ jobs:
       - name: Test - PHPUnit with coverage
         env:
           XDEBUG_MODE: coverage
-          APP_ENV: testing
-          DB_CONNECTION: mysql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_DATABASE: skillhub_db
-          DB_USERNAME: skillhub_user
-          DB_PASSWORD: skillhub_pass
-          MONGO_HOST: 127.0.0.1
-          MONGO_PORT: 27017
-          MONGO_DATABASE: skillhub_logs
         run: |
-          APP_KEY_VALUE=$(grep '^APP_KEY=' .env | cut -d'=' -f2-)
-          JWT_SECRET_VALUE=$(grep '^JWT_SECRET=' .env | cut -d'=' -f2-)
-          export APP_KEY="$APP_KEY_VALUE"
-          export JWT_SECRET="$JWT_SECRET_VALUE"
           mkdir -p build/logs
           php artisan test \
             --coverage-clover=build/logs/clover.xml \
@@ -87,8 +85,12 @@ jobs:
 
       - name: Verify coverage reports exist
         run: |
+          echo "=== Contenu build/logs ==="
           ls -la build/logs/
+          echo "=== Lignes dans clover.xml ==="
           wc -l build/logs/clover.xml
+          echo "=== Debut clover.xml ==="
+          head -5 build/logs/clover.xml
 
       - name: Build Docker image
         run: docker build -t skillhub-api:${{ github.sha }} .
