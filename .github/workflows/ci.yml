@@ -1,141 +1,106 @@
-  $ci = @'
-  name: CI - SkillHub Backend
-
-  on:
-    push:
-      branches: [main, dev]
-    pull_request:
-      branches: [main, dev]
-
-  jobs:
-
-    test:
-      name: Lint, Tests et Couverture
-      runs-on: ubuntu-latest
-
-      services:
-        mongodb:
-          image: mongo:6
-          ports:
-            - 27017:27017
-          options: >-
-            --health-cmd "mongosh --eval 'db.runCommand(\"ping\").ok'"
-            --health-interval 10s
-            --health-timeout 5s
-            --health-retries 5
-
-      steps:
-        - name: Checkout du code
-          uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
-
-        - name: Installation de PHP 8.2
-          uses: shivammathur/setup-php@v2
-          with:
-            php-version: '8.2'
-            extensions: mbstring, xml, pdo_sqlite, mongodb-2.2.0, pcov, gd
-            coverage: pcov
-
-        - name: Cache Composer
-          uses: actions/cache@v4
-          with:
-            path: vendor
-            key: composer-${{ hashFiles('composer.lock') }}
-            restore-keys: composer-
-
-        - name: Installation des dependances
-          run: composer install --prefer-dist --no-progress --no-interaction
-
-        - name: Lint PHP
-          run: find app routes -name "*.php" | xargs php -l
-
-        - name: Generation du fichier .env
-          run: |
-            printf 'APP_NAME=SkillHub\n' > .env
-            printf 'APP_ENV=testing\n' >> .env
-            printf 'APP_KEY=\n' >> .env
-            printf 'APP_DEBUG=true\n' >> .env
-            printf 'APP_URL=http://localhost\n' >> .env
-            printf 'DB_CONNECTION=sqlite\n' >> .env
-            printf 'DB_DATABASE=:memory:\n' >> .env
-            printf 'MONGO_HOST=127.0.0.1\n' >> .env
-            printf 'MONGO_PORT=27017\n' >> .env
-            printf 'MONGO_DATABASE=skillhub_test\n' >> .env
-            printf 'JWT_SECRET=skillhub_ci_test_secret_key_32chars_ok\n' >> .env
-            printf 'JWT_TTL=60\n' >> .env
-            printf 'JWT_REFRESH_TTL=20160\n' >> .env
-            printf 'JWT_BLACKLIST_ENABLED=true\n' >> .env
-            printf 'MAIL_MAILER=array\n' >> .env
-            printf 'CACHE_STORE=array\n' >> .env
-            printf 'QUEUE_CONNECTION=sync\n' >> .env
-            printf 'SESSION_DRIVER=array\n' >> .env
-
-        - name: Generation de la cle applicative
-          run: php artisan key:generate
-
-        - name: Migration base de donnees
-          run: php artisan migrate --force
-
-        - name: Creation du dossier build/logs
-          run: mkdir -p build/logs
-
-        - name: Tests avec couverture de code
-          run: php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
-
-        - name: Analyse SonarCloud
-          uses: SonarSource/sonarqube-scan-action@v4
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          with:
-            args: >
-              -Dsonar.php.coverage.reportPaths=build/logs/clover.xml
-              -Dsonar.php.tests.reportPath=build/logs/junit.xml
-
-    build:
-      name: Build Image Docker
-      runs-on: ubuntu-latest
-      needs: test
-
-      steps:
-        - name: Checkout du code
-          uses: actions/checkout@v4
-
-        - name: Build image Docker
-          run: docker build -t skillhub-api:${{ github.sha }} .
-
-    deploy:
-      name: Push vers Docker Hub
-      runs-on: ubuntu-latest
-      needs: build
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-      steps:
-        - name: Checkout du code
-          uses: actions/checkout@v4
-
-        - name: Connexion a Docker Hub
-          uses: docker/login-action@v3
-          with:
-            username: ${{ secrets.DOCKERHUB_USERNAME }}
-            password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-        - name: Build et Push image Docker
-          uses: docker/build-push-action@v6
-          with:
-            context: .
-            push: true
-            tags: ${{ secrets.DOCKERHUB_USERNAME }}/skillhub-api:${{ github.sha }}
-    '@
-
-# Ecrire SANS BOM
-[System.IO.File]::WriteAllText(
-    (Resolve-Path ".github\workflows\ci.yml"),
-    $ci
-)
-
-# Verifier les premiers caracteres (ne doit pas commencer par EF BB BF)
-$bytes = [System.IO.File]::ReadAllBytes(".github\workflows\ci.yml")
-Write-Host "Premiers octets (hex) : $($bytes[0].ToString('X2')) $($bytes[1].ToString('X2')) $($bytes[2].ToString('X2'))"
-  Write-Host "Si c est 6E 61 6D (n-a-m) : OK, pas de BOM"
+name: CI - SkillHub Backend
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+jobs:
+  test:
+    name: Lint, Tests et Couverture
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand(\"ping\").ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Installation de PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, pdo_sqlite, mongodb-2.2.0, pcov, gd
+          coverage: pcov
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+      - name: Installation des dependances
+        run: composer install --prefer-dist --no-progress --no-interaction
+      - name: Lint PHP
+        run: find app routes -name "*.php" | xargs php -l
+      - name: Generation du fichier .env
+        run: |
+          printf 'APP_NAME=SkillHub\n' > .env
+          printf 'APP_ENV=testing\n' >> .env
+          printf 'APP_KEY=\n' >> .env
+          printf 'APP_DEBUG=true\n' >> .env
+          printf 'APP_URL=http://localhost\n' >> .env
+          printf 'DB_CONNECTION=sqlite\n' >> .env
+          printf 'DB_DATABASE=:memory:\n' >> .env
+          printf 'MONGO_HOST=127.0.0.1\n' >> .env
+          printf 'MONGO_PORT=27017\n' >> .env
+          printf 'MONGO_DATABASE=skillhub_test\n' >> .env
+          printf 'JWT_SECRET=skillhub_ci_test_secret_key_32chars_ok\n' >> .env
+          printf 'JWT_TTL=60\n' >> .env
+          printf 'JWT_REFRESH_TTL=20160\n' >> .env
+          printf 'JWT_BLACKLIST_ENABLED=true\n' >> .env
+          printf 'MAIL_MAILER=array\n' >> .env
+          printf 'CACHE_STORE=array\n' >> .env
+          printf 'QUEUE_CONNECTION=sync\n' >> .env
+          printf 'SESSION_DRIVER=array\n' >> .env
+      - name: Generation de la cle applicative
+        run: php artisan key:generate
+      - name: Migration base de donnees
+        run: php artisan migrate --force
+      - name: Creation du dossier build/logs
+        run: mkdir -p build/logs
+      - name: Tests avec couverture de code
+        run: php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
+      - name: Analyse SonarCloud
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.php.coverage.reportPaths=build/logs/clover.xml
+            -Dsonar.php.tests.reportPath=build/logs/junit.xml
+  build:
+    name: Build Image Docker
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+      - name: Build image Docker
+        run: docker build -t skillhub-api:${{ github.sha }} .
+  deploy:
+    name: Push vers Docker Hub
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+      - name: Connexion a Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build et Push image Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/skillhub-api:${{ github.sha }}
