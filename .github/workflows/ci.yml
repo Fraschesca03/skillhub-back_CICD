@@ -53,18 +53,35 @@ jobs:
 
       - name: Prepare Laravel environment
         run: |
-          cp .env.example .env
+          # Ecrire directement le .env CI sans passer par sed
+          cat > .env << 'ENVEOF'
+          APP_NAME=SkillHub
+          APP_ENV=testing
+          APP_DEBUG=true
+          APP_URL=http://localhost
+          APP_KEY=
+          DB_CONNECTION=mysql
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_DATABASE=skillhub_db
+          DB_USERNAME=skillhub_user
+          DB_PASSWORD=skillhub_pass
+          SESSION_DRIVER=array
+          CACHE_STORE=array
+          QUEUE_CONNECTION=sync
+          MONGO_HOST=127.0.0.1
+          MONGO_PORT=27017
+          MONGO_DATABASE=skillhub_logs
+          MONGO_USERNAME=
+          MONGO_PASSWORD=
+          JWT_SECRET=
+          MAIL_MAILER=log
+          ENVEOF
+          # Supprimer les espaces en debut de ligne dus au heredoc indente
+          sed -i 's/^[[:space:]]*//' .env
+          # Generer APP_KEY et JWT_SECRET
           php artisan key:generate
           php artisan jwt:secret --force
-          sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
-          sed -i "s|^DB_HOST=.*|DB_HOST=127.0.0.1|" .env
-          sed -i "s|^DB_PORT=.*|DB_PORT=3306|" .env
-          sed -i "s|^DB_DATABASE=.*|DB_DATABASE=skillhub_db|" .env
-          sed -i "s|^DB_USERNAME=.*|DB_USERNAME=skillhub_user|" .env
-          sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=skillhub_pass|" .env
-          sed -i "s|^MONGO_HOST=.*|MONGO_HOST=127.0.0.1|" .env
-          sed -i "s|^MONGO_PORT=.*|MONGO_PORT=27017|" .env
-          sed -i "s|^MONGO_DATABASE=.*|MONGO_DATABASE=skillhub_logs|" .env
           echo "=== Verification .env ==="
           grep -E "^DB_|^MONGO_|^JWT_|^APP_KEY" .env
 
@@ -89,7 +106,7 @@ jobs:
           echo "=== Lignes dans clover.xml ==="
           wc -l build/logs/clover.xml
           echo "=== Debut clover.xml ==="
-          head -5 build/logs/clover.xml
+          head -10 build/logs/clover.xml
 
       - name: Build Docker image
         run: docker build -t skillhub-api:${{ github.sha }} .
@@ -103,9 +120,7 @@ jobs:
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         with:
-          args: >
-            -Dsonar.php.coverage.reportPaths=build/logs/clover.xml
-            -Dsonar.php.tests.reportPath=build/logs/junit.xml
+          args: -Dsonar.php.coverage.reportPaths=build/logs/clover.xml -Dsonar.php.tests.reportPath=build/logs/junit.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
