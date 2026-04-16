@@ -18,6 +18,9 @@ Route::post('/login',    [AuthController::class, 'login']);
 Route::get('/profile',   [AuthController::class, 'profile']);
 Route::post('/logout',   [AuthController::class, 'logout']);
 
+// Route upload photo profil — ajoutee car methode existante sans route
+Route::post('/profil/photo', [AuthController::class, 'uploadPhoto']);
+
 // ─── Formations ───────────────────────────────────────────────
 Route::get('/formations',        [FormationController::class, 'index']);
 Route::get('/formations/{id}',   [FormationController::class, 'show']);
@@ -38,13 +41,13 @@ Route::delete('/formations/{id}/inscription', [InscriptionController::class, 'de
 Route::get('/apprenant/formations',           [InscriptionController::class, 'mesFormations']);
 
 // ─── Messagerie ───────────────────────────────────────────────
-Route::get('/messages/non-lus',                      [MessageController::class, 'nonLus']);
-Route::get('/messages/conversations',                [MessageController::class, 'conversations']);
+Route::get('/messages/non-lus',                       [MessageController::class, 'nonLus']);
+Route::get('/messages/conversations',                 [MessageController::class, 'conversations']);
 Route::get('/messages/conversation/{interlocuteurId}',[MessageController::class, 'messagerie']);
-Route::post('/messages/envoyer',                     [MessageController::class, 'envoyer']);
-Route::get('/messages/interlocuteurs',               [MessageController::class, 'interlocuteurs']);
+Route::post('/messages/envoyer',                      [MessageController::class, 'envoyer']);
+Route::get('/messages/interlocuteurs',                [MessageController::class, 'interlocuteurs']);
 
-// Gestion des requêtes preflight CORS
+// ─── Preflight CORS ───────────────────────────────────────────
 Route::options('/{any}', function () {
     return response('', 200);
 })->where('any', '.*');
