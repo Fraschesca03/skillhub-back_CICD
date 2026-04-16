@@ -24,3 +24,8 @@ Homestead.yaml
 Thumbs.db
 
 build/
+# Garder les rapports de couverture pour SonarCloud
+!build/
+!build/logs/
+!build/logs/clover.xml
+!build/logs/junit.xml
