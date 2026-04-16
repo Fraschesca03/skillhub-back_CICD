@@ -23,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP without mongodb
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -31,8 +31,13 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Install ext-mongodb 2.2.0
-        run: sudo pecl install mongodb-2.2.0 && echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
+      - name: Upgrade ext-mongodb to 2.2.0
+        run: |
+          sudo rm -f /etc/php/8.2/cli/conf.d/20-mongodb.ini
+          sudo pecl uninstall mongodb || true
+          sudo pecl install mongodb-2.2.0
+          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
+          php -m | grep mongodb
 
       - name: Cache vendor
         uses: actions/cache@v4
@@ -59,7 +64,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP without mongodb
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -67,8 +72,12 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Install ext-mongodb 2.2.0
-        run: sudo pecl install mongodb-2.2.0 && echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
+      - name: Upgrade ext-mongodb to 2.2.0
+        run: |
+          sudo rm -f /etc/php/8.2/cli/conf.d/20-mongodb.ini
+          sudo pecl uninstall mongodb || true
+          sudo pecl install mongodb-2.2.0
+          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
 
       - name: Download vendor
         uses: actions/download-artifact@v4
@@ -114,7 +123,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup PHP with pcov
+      - name: Setup PHP with pcov without mongodb
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -122,8 +131,13 @@ jobs:
           tools: composer:v2
           coverage: pcov
 
-      - name: Install ext-mongodb 2.2.0
-        run: sudo pecl install mongodb-2.2.0 && echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
+      - name: Upgrade ext-mongodb to 2.2.0
+        run: |
+          sudo rm -f /etc/php/8.2/cli/conf.d/20-mongodb.ini
+          sudo pecl uninstall mongodb || true
+          sudo pecl install mongodb-2.2.0
+          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
+          php -m | grep mongodb
 
       - name: Download vendor
         uses: actions/download-artifact@v4
