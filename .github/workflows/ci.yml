@@ -1,9 +1,3 @@
-# ============================================================
-# SkillHub Backend - Pipeline CI/CD GitHub Actions
-# Fix : ext-mongodb installe en version 2.2.0 via PECL
-#       pour correspondre a composer.lock (require ^2.2)
-# ============================================================
-
 name: CI/CD SkillHub Backend
 
 on:
@@ -22,18 +16,14 @@ env:
 
 jobs:
 
-  # ===========================================================
-  # JOB 1 : INSTALL
-  # ===========================================================
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout du code source
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Installation de PHP 8.2
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -41,44 +31,35 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      # Le composer.lock requiert ext-mongodb ^2.2
-      # L image GitHub Actions a 2.1.4 par defaut donc on force 2.2.0
-      - name: Installation de ext-mongodb 2.2.0 via PECL
-        run: |
-          sudo pecl install mongodb-2.2.0
-          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
-          php -m | grep mongodb
+      - name: Install ext-mongodb 2.2.0
+        run: sudo pecl install mongodb-2.2.0 && echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
 
-      - name: Cache des dependances Composer
+      - name: Cache vendor
         uses: actions/cache@v4
         with:
           path: vendor
           key: composer-${{ hashFiles('composer.lock') }}
           restore-keys: composer-
 
-      - name: Installation des paquets Composer
+      - name: Composer install
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Sauvegarde de vendor
+      - name: Upload vendor
         uses: actions/upload-artifact@v4
         with:
           name: vendor
           path: vendor/
           retention-days: 1
 
-  # ===========================================================
-  # JOB 2 : LINT
-  # ===========================================================
   lint:
-    name: Lint (PSR-12)
+    name: Lint PSR-12
     runs-on: ubuntu-latest
     needs: install
-
     steps:
-      - name: Checkout du code source
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Installation de PHP 8.2
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -86,36 +67,25 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Installation de ext-mongodb 2.2.0 via PECL
-        run: |
-          sudo pecl install mongodb-2.2.0
-          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
+      - name: Install ext-mongodb 2.2.0
+        run: sudo pecl install mongodb-2.2.0 && echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
 
-      - name: Recuperation de vendor
+      - name: Download vendor
         uses: actions/download-artifact@v4
         with:
           name: vendor
           path: vendor/
 
-      - name: Installation de PHP_CodeSniffer
+      - name: Install phpcs
         run: composer global require squizlabs/php_codesniffer --quiet
 
-      - name: Verification PSR-12 sur app/
-        run: |
-          ~/.composer/vendor/bin/phpcs \
-            --standard=PSR12 \
-            --extensions=php \
-            --ignore=app/Http/Middleware/CorsMiddleware.php \
-            app/
+      - name: Run phpcs
+        run: ~/.composer/vendor/bin/phpcs --standard=PSR12 --extensions=php --ignore=app/Http/Middleware/CorsMiddleware.php app/
 
-  # ===========================================================
-  # JOB 3 : TEST + SONARCLOUD
-  # ===========================================================
   test:
-    name: Tests & SonarCloud
+    name: Tests and SonarCloud
     runs-on: ubuntu-latest
     needs: install
-
     services:
       mysql:
         image: mysql:8
@@ -129,7 +99,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
-
       mongodb:
         image: mongo:6
         ports:
@@ -139,14 +108,13 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
-
     steps:
-      - name: Checkout du code source
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Installation de PHP avec pcov pour la couverture
+      - name: Setup PHP with pcov
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -154,24 +122,19 @@ jobs:
           tools: composer:v2
           coverage: pcov
 
-      - name: Installation de ext-mongodb 2.2.0 via PECL
-        run: |
-          sudo pecl install mongodb-2.2.0
-          echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
-          php -m | grep mongodb
+      - name: Install ext-mongodb 2.2.0
+        run: sudo pecl install mongodb-2.2.0 && echo "extension=mongodb.so" | sudo tee /etc/php/8.2/cli/conf.d/20-mongodb.ini
 
-      - name: Recuperation de vendor
+      - name: Download vendor
         uses: actions/download-artifact@v4
         with:
           name: vendor
           path: vendor/
 
-      - name: Preparation du fichier .env
-        run: |
-          cp .env.example .env
-          php artisan key:generate --quiet
+      - name: Setup env
+        run: cp .env.example .env && php artisan key:generate --quiet
 
-      - name: Migration de la base de donnees
+      - name: Run migrations
         env:
           APP_ENV: testing
           DB_CONNECTION: mysql
@@ -183,13 +146,13 @@ jobs:
           MONGO_HOST: 127.0.0.1
           MONGO_PORT: 27017
           MONGO_DATABASE: skillhub_test
-          JWT_SECRET: ci_test_secret_key_for_skillhub_pipeline
+          JWT_SECRET: ci_test_secret_key_skillhub
           CACHE_STORE: array
           SESSION_DRIVER: array
           QUEUE_CONNECTION: sync
         run: php artisan migrate --force --quiet
 
-      - name: Execution des tests avec couverture
+      - name: Run tests with coverage
         env:
           APP_ENV: testing
           APP_KEY: ${{ secrets.APP_KEY }}
@@ -202,67 +165,51 @@ jobs:
           MONGO_HOST: 127.0.0.1
           MONGO_PORT: 27017
           MONGO_DATABASE: skillhub_test
-          JWT_SECRET: ci_test_secret_key_for_skillhub_pipeline
+          JWT_SECRET: ci_test_secret_key_skillhub
           CACHE_STORE: array
           SESSION_DRIVER: array
           QUEUE_CONNECTION: sync
           MAIL_MAILER: array
-        run: |
-          mkdir -p build/logs
-          php artisan test \
-            --coverage-clover=build/logs/clover.xml \
-            --log-junit=build/logs/junit.xml
+        run: mkdir -p build/logs && php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
 
-      - name: Scan SonarCloud
+      - name: SonarCloud scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # ===========================================================
-  # JOB 4 : BUILD
-  # ===========================================================
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
     needs: [lint, test]
-
     steps:
-      - name: Checkout du code source
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Construction de l image Docker taguee avec le git SHA
-        run: |
-          docker build \
-            -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -t ${{ env.IMAGE_NAME }}:latest \
-            .
+      - name: Build image
+        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.IMAGE_NAME }}:latest .
 
-  # ===========================================================
-  # JOB 5 (CD) : PUSH - uniquement apres merge sur main
-  # ===========================================================
   push:
     name: Push to Docker Hub
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
     steps:
-      - name: Checkout du code source
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Connexion a Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build et push de l image taguee
+      - name: Build and push
         run: |
           docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
           docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
           docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.IMAGE_NAME }}:latest
 
-      - name: Confirmation du tag publie
-        run: echo "Image publiee : ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+      - name: Show published tag
+        run: echo "Published ${{ env.IMAGE_NAME }}:${{ github.sha }}"
