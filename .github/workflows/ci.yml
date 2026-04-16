@@ -95,19 +95,20 @@ jobs:
           vendor/bin/phpcs --standard=PSR12 --ignore=app/Http/Middleware,app/Providers,app/Mail,app/Console app/ || true
 
       - name: Test - PHPUnit with coverage
-        env:
-          XDEBUG_MODE: coverage
         run: |
           mkdir -p build/logs
-          vendor/bin/phpunit \
-          --coverage-clover=build/logs/clover.xml \
-          --log-junit=build/logs/junit.xml
-      - name: Verify coverage reports exist
+          XDEBUG_MODE=coverage php -d xdebug.mode=coverage ./vendor/bin/phpunit \
+            --coverage-clover=build/logs/clover.xml \
+            --log-junit=build/logs/junit.xml
+
+      - name: Verify coverage file content
         run: |
           echo "=== Contenu build/logs ==="
           ls -la build/logs/
-          echo "=== Debut clover.xml ==="
+          echo "=== First lines of clover.xml ==="
           head -20 build/logs/clover.xml
+          echo "=== Search for Windows paths ==="
+          grep -n "C:\\\\xampp" build/logs/clover.xml || true
 
       - name: Build Docker image
         run: docker build -t skillhub-api:${{ github.sha }} .
@@ -147,10 +148,3 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }} .
           docker push ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}
           echo "Image pushed: ${{ secrets.DOCKER_USERNAME }}/skillhub-api:${{ github.sha }}"
-
-  - name: Verify coverage file content
-    run: |
-      echo "=== First lines of clover.xml ==="
-      head -20 build/logs/clover.xml
-      echo "=== Search for Windows paths ==="
-      grep -n "C:\\\\xampp" build/logs/clover.xml || true
