@@ -56,7 +56,6 @@ jobs:
           cp .env.example .env
           php artisan key:generate
           php artisan jwt:secret --force
-          # Ecraser les credentials DB dans le .env avec les valeurs CI
           sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
           sed -i "s|^DB_HOST=.*|DB_HOST=127.0.0.1|" .env
           sed -i "s|^DB_PORT=.*|DB_PORT=3306|" .env
@@ -103,6 +102,10 @@ jobs:
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.php.coverage.reportPaths=build/logs/clover.xml
+            -Dsonar.php.tests.reportPath=build/logs/junit.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
