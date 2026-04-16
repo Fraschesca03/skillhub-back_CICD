@@ -580,4 +580,55 @@ class SkillHubTest extends TestCase
 
         $response->assertStatus(404);
     }
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function login_sans_email(): void
+    {
+        $response = $this->postJson('/api/login', [
+            'password' => '123456'
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function login_sans_password(): void
+    {
+        $response = $this->postJson('/api/login', [
+            'email' => 'test@test.com'
+        ]);
+
+        $response->assertStatus(422);
+    }
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function filtre_par_categorie(): void
+    {
+        $response = $this->getJson('/api/formations?categorie=developpement_web');
+
+        $response->assertStatus(200);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function filtre_par_niveau(): void
+    {
+        $response = $this->getJson('/api/formations?niveau=debutant');
+
+        $response->assertStatus(200);
+    }
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function desinscription_sans_token(): void
+    {
+        $response = $this->deleteJson('/api/formations/1/inscription');
+
+        $response->assertStatus(401);
+    }
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function supprimer_module_inexistant(): void
+    {
+        ['token' => $token] = $this->creerUtilisateur('formateur');
+
+        $response = $this->deleteJson('/api/modules/999', [], $this->headers($token));
+
+        $response->assertStatus(404);
+    }
+
 }
