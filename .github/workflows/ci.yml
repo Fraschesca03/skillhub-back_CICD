@@ -7,7 +7,6 @@ on:
     branches: [main, dev]
 
 jobs:
-
   ci:
     name: CI - Install / Lint / Test / Build
     runs-on: ubuntu-latest
@@ -22,16 +21,23 @@ jobs:
           MYSQL_ROOT_PASSWORD: root_pass
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping -h localhost" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
       mongodb:
         image: mongo:6
         ports:
           - 27017:27017
-        options: --health-cmd="mongosh --eval 'db.runCommand({ping:1})'" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: >-
+          --health-cmd="mongosh --eval 'db.runCommand({ping:1})'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -93,22 +99,16 @@ jobs:
           XDEBUG_MODE: coverage
         run: |
           mkdir -p build/logs
-          php artisan test \
+          php -d xdebug.mode=coverage vendor/bin/phpunit \
             --coverage-clover=build/logs/clover.xml \
             --log-junit=build/logs/junit.xml
-
-      - name: Fix coverage paths
-        run: |
-          sed -i 's|C:\\xampp\\htdocs\\skillhub-final\\skillhub-back\\||g' build/logs/clover.xml
 
       - name: Verify coverage reports exist
         run: |
           echo "=== Contenu build/logs ==="
           ls -la build/logs/
-          echo "=== Lignes dans clover.xml ==="
-          wc -l build/logs/clover.xml
           echo "=== Debut clover.xml ==="
-          head -10 build/logs/clover.xml
+          head -20 build/logs/clover.xml
 
       - name: Build Docker image
         run: docker build -t skillhub-api:${{ github.sha }} .
