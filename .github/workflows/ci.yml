@@ -99,10 +99,9 @@ jobs:
           XDEBUG_MODE: coverage
         run: |
           mkdir -p build/logs
-          php -d xdebug.mode=coverage vendor/bin/phpunit \
-            --coverage-clover=build/logs/clover.xml \
-            --log-junit=build/logs/junit.xml
-
+          vendor/bin/phpunit \
+          --coverage-clover=build/logs/clover.xml \
+          --log-junit=build/logs/junit.xml
       - name: Verify coverage reports exist
         run: |
           echo "=== Contenu build/logs ==="

@@ -4,9 +4,9 @@
 
 | Role | Membre | Responsabilites |
 |------|--------|-----------------|
-| Cloud Architect | Membre 1 | Rapport d audit cloud, comparaison fournisseurs, schema C4, plan budgetaire |
-| DevOps Engineer | Membre 2 | Dockerfiles, docker-compose.yml, pipeline CI/CD GitHub Actions |
-| Tech Lead | Membre 3 | Versionning Git, CONTRIBUTING.md, README.md, orchestration, securite |
+| Cloud Architect | Fitia  | Rapport d audit cloud, comparaison fournisseurs, schema C4, plan budgetaire |
+| DevOps Engineer | Nirina | Dockerfiles, docker-compose.yml, pipeline CI/CD GitHub Actions |
+| Tech Lead | Theo   | Versionning Git, CONTRIBUTING.md, README.md, orchestration, securite |
 
 ---
 
