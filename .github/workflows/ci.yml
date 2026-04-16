@@ -53,7 +53,6 @@ jobs:
 
       - name: Prepare Laravel environment
         run: |
-          # Ecrire directement le .env CI sans passer par sed
           cat > .env << 'ENVEOF'
           APP_NAME=SkillHub
           APP_ENV=testing
@@ -77,9 +76,8 @@ jobs:
           JWT_SECRET=
           MAIL_MAILER=log
           ENVEOF
-          # Supprimer les espaces en debut de ligne dus au heredoc indente
+
           sed -i 's/^[[:space:]]*//' .env
-          # Generer APP_KEY et JWT_SECRET
           php artisan key:generate
           php artisan jwt:secret --force
           echo "=== Verification .env ==="
@@ -98,6 +96,10 @@ jobs:
           php artisan test \
             --coverage-clover=build/logs/clover.xml \
             --log-junit=build/logs/junit.xml
+
+      - name: Fix coverage paths
+        run: |
+          sed -i 's|C:\\xampp\\htdocs\\skillhub-final\\skillhub-back\\||g' build/logs/clover.xml
 
       - name: Verify coverage reports exist
         run: |
@@ -132,7 +134,6 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v4
 
