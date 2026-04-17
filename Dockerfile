@@ -69,7 +69,8 @@ COPY --from=builder /app /var/www/html
 RUN mkdir -p /var/www/html/public/images/profils
 
 # Permissions Laravel
-RUN chown -R www-data:www-data /var/www/html/storage \
+RUN mkdir -p /var/www/html/bootstrap/cache \
+    && chown -R www-data:www-data /var/www/html/storage \
     && chown -R www-data:www-data /var/www/html/bootstrap/cache \
     && chown -R www-data:www-data /var/www/html/public/images \
     && chmod -R 775 /var/www/html/storage \
