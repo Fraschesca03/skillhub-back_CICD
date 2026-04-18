@@ -6,11 +6,11 @@ Guide de contribution pour le projet SkillHub (Bloc 03 — Cloud, DevOps et Arch
 
 ## Répartition des rôles
 
-| Membre | Rôle | Responsabilités principales |
-|--------|------|-----------------------------|
-| Nirina | Tech Lead | Versionning Git, README, CONTRIBUTING, coordination, SonarCloud |
-| Membre 2 | Cloud Architect | Rapport d'audit, schéma C4, plan budgétaire, comparaison cloud |
-| Membre 3 | DevOps Engineer | Dockerfile, docker-compose.yml, pipeline CI/CD, orchestration |
+| Membre | Rôle            | Responsabilités principales                                     |
+| ------ | --------------- | --------------------------------------------------------------- |
+| Nirina | Tech Lead       | Versionning Git, README, CONTRIBUTING, coordination, SonarCloud |
+| Theo   | Cloud Architect | Rapport d'audit, schéma C4, plan budgétaire, comparaison cloud  |
+| Fitia  | DevOps Engineer | Dockerfile, docker-compose.yml, pipeline CI/CD, orchestration   |
 
 ---
 
@@ -29,11 +29,11 @@ dev     ← Intégration : accumule les fonctionnalités validées
 
 ### Règles obligatoires
 
-- Jamais de commit direct sur `main`
-- Tout développement passe par une branche `feature/<nom>`
-- Les Pull Requests doivent mentionner l'auteur et décrire le travail
-- Un reviewer minimum avant de merger sur `dev`
-- `main` ne reçoit que des merges depuis `dev` (ou `hotfix/`)
+-   Jamais de commit direct sur `main`
+-   Tout développement passe par une branche `feature/<nom>`
+-   Les Pull Requests doivent mentionner l'auteur et décrire le travail
+-   Un reviewer minimum avant de merger sur `dev`
+-   `main` ne reçoit que des merges depuis `dev` (ou `hotfix/`)
 
 ---
 
@@ -49,16 +49,16 @@ dev     ← Intégration : accumule les fonctionnalités validées
 
 ### Types autorisés
 
-| Type | Usage | Exemple |
-|------|-------|---------|
-| `feat` | Nouvelle fonctionnalité | `feat(api): add JWT authentication middleware` |
-| `fix` | Correction de bug | `fix: resolve port conflict in docker-compose.yml` |
-| `docker` | Fichiers de conteneurisation | `docker: add multi-stage Dockerfile for API` |
-| `ci` | Pipeline CI/CD | `ci: configure GitHub Actions with lint and test stages` |
-| `docs` | Documentation | `docs: update README with docker compose up instructions` |
-| `test` | Ajout ou correction de tests | `test: add CoverageTest for FormationController` |
-| `chore` | Maintenance | `chore: update composer dependencies` |
-| `refactor` | Refactoring sans changement fonctionnel | `refactor: extract JWT helper to base controller` |
+| Type       | Usage                                   | Exemple                                                   |
+| ---------- | --------------------------------------- | --------------------------------------------------------- |
+| `feat`     | Nouvelle fonctionnalité                 | `feat(api): add JWT authentication middleware`            |
+| `fix`      | Correction de bug                       | `fix: resolve port conflict in docker-compose.yml`        |
+| `docker`   | Fichiers de conteneurisation            | `docker: add multi-stage Dockerfile for API`              |
+| `ci`       | Pipeline CI/CD                          | `ci: configure GitHub Actions with lint and test stages`  |
+| `docs`     | Documentation                           | `docs: update README with docker compose up instructions` |
+| `test`     | Ajout ou correction de tests            | `test: add CoverageTest for FormationController`          |
+| `chore`    | Maintenance                             | `chore: update composer dependencies`                     |
+| `refactor` | Refactoring sans changement fonctionnel | `refactor: extract JWT helper to base controller`         |
 
 ### Exemples concrets du projet
 
@@ -76,25 +76,28 @@ docs: add C4 architecture diagrams to audit report
 ## Procédure de Pull Request
 
 1. Créer une branche depuis `dev` :
-   ```bash
-   git checkout dev
-   git pull origin dev
-   git checkout -b feature/nom-descriptif
-   ```
+
+    ```bash
+    git checkout dev
+    git pull origin dev
+    git checkout -b feature/nom-descriptif
+    ```
 
 2. Développer et commiter avec Conventional Commits
 
 3. Pousser la branche :
-   ```bash
-   git push origin feature/nom-descriptif
-   ```
+
+    ```bash
+    git push origin feature/nom-descriptif
+    ```
 
 4. Ouvrir une Pull Request sur GitHub :
-   - **Titre** : `feat(scope): description` (même format que les commits)
-   - **Description** : ce qui a été fait, pourquoi, comment tester
-   - **Assignee** : l'auteur
-   - **Reviewer** : un autre membre de l'équipe
-   - **Base branch** : `dev` (jamais `main` directement)
+
+    - **Titre** : `feat(scope): description` (même format que les commits)
+    - **Description** : ce qui a été fait, pourquoi, comment tester
+    - **Assignee** : l'auteur
+    - **Reviewer** : un autre membre de l'équipe
+    - **Base branch** : `dev` (jamais `main` directement)
 
 5. Le reviewer approuve ou demande des modifications
 
@@ -171,10 +174,12 @@ Ne jamais commiter `.env` (protégé par `.gitignore`).
 ## Quality Gate SonarCloud
 
 Le pipeline bloque si :
-- Couverture de code sur le nouveau code < 80 %
-- Issues critiques introduites > 0
+
+-   Couverture de code sur le nouveau code < 80 %
+-   Issues critiques introduites > 0
 
 Vérifier localement avant de pousser :
+
 ```bash
 php artisan test --coverage-clover=build/logs/clover.xml --log-junit=build/logs/junit.xml
 ```
